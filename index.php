@@ -1,12 +1,41 @@
 <?php
 
-const KEY = '$2a$10$vZTkiGHNXmUtmdR8ClTHZO4R/TTioh12ZjbwAukH3mn8i.pOLHeZO';
+/**
+ * `https://windows.php.net/download/`
+ * unpack to `c:\php`
+ * mv `php.ini-develop` to `php.ini`
+ * uncomment `extension=curl`
+ */
 
-const URL_GAMES = 'https://api.curseforge.com/v1/games';
+const PATH_ADDONS = 'C:\Program Files (x86)\World of Warcraft\_retail_\Interface\AddOns';
 
-const GAME_ID_WOW = 1;
+const URL_ROOT = 'https://api.curseforge.com';
+const URL_GAMES = URL_ROOT . '/v1/games';
+const URL_MOD = URL_ROOT . '/v1/mods/'; // + modId
+
+const HEADER_TITLE = '## Title: ';
+const HEADER_ID = '## X-Curse-Project-ID: ';
+
+const SKIP_IF_HEADER = [
+  // '## RequiredDeps: ',
+  '## Dependencies: ',
+  '## LoadOnDemand: ',
+];
+
+const SKIP_IF_NAME = [
+  'TInterface',
+];
+
+const SKIP_IF_NO_HEADER = [
+  '## Version: ',
+];
+
+$KEY = file_get_contents('key.txt');
+$GAME_ID_WOW = null;
 
 function get($url) {
+  global $KEY;
+  
   $ch = curl_init();
   curl_setopt($ch, CURLOPT_URL, $url);
   // curl_setopt($ch, CURLOPT_POST, 1);
@@ -19,7 +48,7 @@ function get($url) {
   $headers = [
       'User-Agent: Php wow addon updater 0.0.1',
       'Accept: application/json',
-      'x-api-key: ' . KEY,
+      'x-api-key: ' . $KEY,
   ];
 
   curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
@@ -27,9 +56,7 @@ function get($url) {
   $server_output = curl_exec($ch);
   
   if (!$server_output) {
-    echo 'Curl error: ' . curl_error($ch) . " on {$url}\n";
-    
-    die;
+    die('Curl error: ' . curl_error($ch) . " on {$url}\n");
   }
 
   curl_close($ch);
@@ -37,6 +64,112 @@ function get($url) {
   return $server_output;
 }
 
-//$games = get(URL_GAMES);
-//$games = json_decode($games);
-//echo json_encode($games, JSON_PRETTY_PRINT);
+$games = get(URL_GAMES);
+$games = json_decode($games, true);
+// echo json_encode($games, JSON_PRETTY_PRINT);
+
+foreach ($games['data'] ?? [] as $game) {
+  if (($game['name'] ?? '') == 'World of Warcraft') {
+    $GAME_ID_WOW = $game['id'] ?? null;
+    echo "GAME_ID_WOW = {$GAME_ID_WOW}\n";
+    
+    break;
+  }
+}
+
+if (!$GAME_ID_WOW) {
+  die("GAME_ID_WOW not found\n");
+}
+
+function getAddons() {
+  $names = [];
+  $ids = [];
+
+  $folders = scandir(PATH_ADDONS);
+  foreach ($folders as $folder) {
+    // echo "{$folder}\n";
+    $name = null;
+    $id = null;
+  
+    if (substr($folder, 0, 1) == '.') continue;
+    $fullPath = PATH_ADDONS . "\\" . $folder;
+    if (!is_dir($fullPath)) continue;
+    
+    // $skipFolder = false;
+
+    $files = scandir($fullPath);
+    foreach ($files as $file) {
+      // echo "  {$file}\n";
+
+      if (substr($file, 0, 1) == '.') continue;
+      $fullPathFile = PATH_ADDONS . "\\" . $folder . "\\" . $file;
+      if (is_dir($fullPathFile)) continue;
+      
+      $ext = pathinfo($fullPathFile, PATHINFO_EXTENSION);
+      // echo "    {$ext}\n";
+      
+      if ($ext != "toc") continue;
+      echo "  {$file}\n";
+      
+      $skipNoHeader = true;
+      
+      $lines = file($fullPathFile);
+      foreach ($lines as $line) {
+        if (strpos($line, HEADER_TITLE) !== false) {
+          $name = str_replace(HEADER_TITLE, '', $line);
+          echo "    name={$name}\n";
+        }
+        
+        if (strpos($line, HEADER_ID) !== false) {
+          $id = str_replace(HEADER_ID, '', $line);
+          echo "    id={$id}\n";
+        }
+        
+        foreach (SKIP_IF_HEADER as $badHeader) {
+          if (strpos($line, $badHeader) !== false) {
+            echo "      badHeader {$badHeader}\n";
+            break 3;
+          }
+        }
+        
+        foreach (SKIP_IF_NO_HEADER as $goodHeader) {
+          if (strpos($line, $goodHeader) !== false) {
+            echo "      goodHeader {$goodHeader}\n";
+            $skipNoHeader = false;
+          }
+        }
+      } // lines
+      
+      
+      if ($skipNoHeader) {
+        $id = null;
+        $name = null;
+        continue;
+      }
+
+      if (false && $id) {
+        $ids[] = $id;
+        break;
+      }
+      
+      if ($name) {
+        foreach (SKIP_IF_NAME as $badName) {
+          if (strpos($name, $badName) !== false) {
+            echo "      badName {$badName}\n";
+            $name = null;
+            break;
+          }
+        }
+
+        if ($name) {
+          $names[] = trim($name);
+          break;
+        }
+      }
+    } // files
+  } // folders
+  
+  var_dump([$ids, $names]);
+}
+
+$AddonNames = getAddons();
