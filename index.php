@@ -19,7 +19,7 @@ const HEADER_ID = '## X-Curse-Project-ID: ';
 const SKIP_IF_HEADER = [
   // '## RequiredDeps: ',
   '## Dependencies: ',
-  '## LoadOnDemand: ',
+  '## LoadOnDemand: 1',
 ];
 
 const SKIP_IF_NAME = [
@@ -83,13 +83,11 @@ if (!$GAME_ID_WOW) {
 
 function getAddons() {
   $names = [];
-  $ids = [];
 
   $folders = scandir(PATH_ADDONS);
   foreach ($folders as $folder) {
     // echo "{$folder}\n";
     $name = null;
-    $id = null;
   
     if (substr($folder, 0, 1) == '.') continue;
     $fullPath = PATH_ADDONS . "\\" . $folder;
@@ -116,13 +114,8 @@ function getAddons() {
       $lines = file($fullPathFile);
       foreach ($lines as $line) {
         if (strpos($line, HEADER_TITLE) !== false) {
-          $name = str_replace(HEADER_TITLE, '', $line);
+          $name = trim(str_replace(HEADER_TITLE, '', $line));
           echo "    name={$name}\n";
-        }
-        
-        if (strpos($line, HEADER_ID) !== false) {
-          $id = str_replace(HEADER_ID, '', $line);
-          echo "    id={$id}\n";
         }
         
         foreach (SKIP_IF_HEADER as $badHeader) {
@@ -142,14 +135,9 @@ function getAddons() {
       
       
       if ($skipNoHeader) {
-        $id = null;
+        echo "      skipNoHeader\n";
         $name = null;
         continue;
-      }
-
-      if (false && $id) {
-        $ids[] = $id;
-        break;
       }
       
       if ($name) {
@@ -162,14 +150,14 @@ function getAddons() {
         }
 
         if ($name) {
-          $names[] = trim($name);
+          $names[] = $name;
           break;
         }
       }
     } // files
   } // folders
   
-  var_dump([$ids, $names]);
+  var_dump($names);
 }
 
 $AddonNames = getAddons();
