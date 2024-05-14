@@ -7,14 +7,21 @@
  * uncomment `extension=curl`
  */
 
-const PATH_ADDONS = 'C:\Program Files (x86)\World of Warcraft\_retail_\Interface\AddOns';
+const PATH_ROOT = 'C:\Program Files (x86)\World of Warcraft\_retail_';
+
+const PATH_ADDONS = PATH_ROOT . '\Interface\AddOns';
+const PATH_WTF = PATH_ROOT . '\WTF';
 
 const URL_ROOT = 'https://api.curseforge.com';
 const URL_GAMES = URL_ROOT . '/v1/games';
 const URL_MOD = URL_ROOT . '/v1/mods/'; // + modId
+const URL_SEARCH_MOD = URL_ROOT . '/v1/mods/search?'; // + query
 
 const HEADER_TITLE = '## Title: ';
 const HEADER_ID = '## X-Curse-Project-ID: ';
+const HEADER_VERSION = '## Version: ';
+
+const WTF_GAME_VERSION = 'SET lastAddonVersion ';
 
 const SKIP_IF_HEADER = [
   // '## RequiredDeps: ',
@@ -32,6 +39,26 @@ const SKIP_IF_NO_HEADER = [
 
 $KEY = file_get_contents('key.txt');
 $GAME_ID_WOW = null;
+
+function getGameVersion() {
+  $lines = file(PATH_WTF . '\Config.wtf');
+  
+  foreach ($lines as $line) {
+    if (strpos($line, WTF_GAME_VERSION) !== false) {
+      $version = trim(str_replace(WTF_GAME_VERSION, '', $line), " \n\r\t\v\x00\"");
+      // echo "game version={$version}\n";
+      
+      return intval(substr($version, 0, 2)) . "." . intval(substr($version, 2, 2)) . "." . intval(substr($version, 4, 2));
+    }
+  }
+  
+  return null;
+}
+
+$gameVersion = getGameVersion();
+if (!$gameVersion) {
+  die("No game version found");
+}
 
 function get($url) {
   global $KEY;
@@ -71,7 +98,7 @@ $games = json_decode($games, true);
 foreach ($games['data'] ?? [] as $game) {
   if (($game['name'] ?? '') == 'World of Warcraft') {
     $GAME_ID_WOW = $game['id'] ?? null;
-    echo "GAME_ID_WOW = {$GAME_ID_WOW}\n";
+    // echo "GAME_ID_WOW = {$GAME_ID_WOW}\n";
     
     break;
   }
@@ -87,7 +114,6 @@ function getAddons() {
   $folders = scandir(PATH_ADDONS);
   foreach ($folders as $folder) {
     // echo "{$folder}\n";
-    $name = null;
   
     if (substr($folder, 0, 1) == '.') continue;
     $fullPath = PATH_ADDONS . "\\" . $folder;
@@ -97,6 +123,9 @@ function getAddons() {
 
     $files = scandir($fullPath);
     foreach ($files as $file) {
+      $name = null;
+      $version = null;
+
       // echo "  {$file}\n";
 
       if (substr($file, 0, 1) == '.') continue;
@@ -107,7 +136,7 @@ function getAddons() {
       // echo "    {$ext}\n";
       
       if ($ext != "toc") continue;
-      echo "  {$file}\n";
+      // echo "  {$file}\n";
       
       $skipNoHeader = true;
       
@@ -115,19 +144,24 @@ function getAddons() {
       foreach ($lines as $line) {
         if (strpos($line, HEADER_TITLE) !== false) {
           $name = trim(str_replace(HEADER_TITLE, '', $line));
-          echo "    name={$name}\n";
+          // echo "    name={$name}\n";
         }
-        
+       
+        if (strpos($line, HEADER_VERSION) !== false) {
+          $version = trim(str_replace(HEADER_VERSION, '', $line));
+          // echo "    version={$version}\n";
+        }
+         
         foreach (SKIP_IF_HEADER as $badHeader) {
           if (strpos($line, $badHeader) !== false) {
-            echo "      badHeader {$badHeader}\n";
+            // echo "      badHeader {$badHeader}\n";
             break 3;
           }
         }
         
         foreach (SKIP_IF_NO_HEADER as $goodHeader) {
           if (strpos($line, $goodHeader) !== false) {
-            echo "      goodHeader {$goodHeader}\n";
+            // echo "      goodHeader {$goodHeader}\n";
             $skipNoHeader = false;
           }
         }
@@ -135,29 +169,80 @@ function getAddons() {
       
       
       if ($skipNoHeader) {
-        echo "      skipNoHeader\n";
-        $name = null;
+        // echo "      skipNoHeader\n";
         continue;
       }
       
-      if ($name) {
+      if ($name && $version) {
         foreach (SKIP_IF_NAME as $badName) {
           if (strpos($name, $badName) !== false) {
-            echo "      badName {$badName}\n";
+            // echo "      badName {$badName}\n";
             $name = null;
             break;
           }
         }
 
         if ($name) {
-          $names[] = $name;
+          $names[$name] = $version;
           break;
         }
       }
     } // files
   } // folders
   
-  var_dump($names);
+  return $names;
 }
 
-$AddonNames = getAddons();
+$addonNames = getAddons();
+
+function getModId($name) {
+  global $GAME_ID_WOW;
+  $query = http_build_query(['gameId' => $GAME_ID_WOW, 'searchFilter' => $name, 'sortField' => 2, 'sortOrder' => 'desc']); // 2 - popular
+  
+  $mods = get(URL_SEARCH_MOD . $query);
+  $mods = json_decode($mods, true);
+  // var_dump(json_encode($mods, JSON_PRETTY_PRINT));
+  
+  foreach ($mods['data'] ?? [] as $mod) {
+    if (($mod['name'] ?? '') == $name) 
+      return $mod;
+  }
+  
+  return null;
+}
+
+foreach ($addonNames as $name => $version) {
+  echo "{$name} local:[$version] ";
+
+  $mod = getModId($name);
+  
+  $files = $mod['latestFiles'] ?? [];
+  // var_dump($files);
+  
+  foreach ($files as $file) {
+    $fileGameVersion = $file['gameVersions'] ?? [];
+    if (in_array($gameVersion, $fileGameVersion)) {
+      // var_dump($file); echo "\n\n\n";
+      
+      $fileVersion = $file["displayName"] ?? '';
+      
+      echo "remote:[$fileVersion] ";
+      
+      if ($fileVersion <> $version) {
+        $download = $file['downloadUrl'] ?? "";
+        echo "has update -> {$download}";
+      }
+      else {
+        echo "has NO update";
+      }
+      
+      break;
+    }
+  }
+  
+  echo "\n";
+  
+  // echo $version . "\n";
+  
+  // break;
+}
