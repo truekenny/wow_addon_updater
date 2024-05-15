@@ -5,9 +5,11 @@
  * unpack to `c:\php`
  * mv `php.ini-develop` to `php.ini`
  * uncomment `extension=curl`
+ * uncomment `extension=zip`
  */
 
 const PATH_ROOT = 'C:\Program Files (x86)\World of Warcraft\_retail_';
+const URL_DOWNLOAD = 'https://mediafilez.forgecdn.net/files/';
 
 const PATH_ADDONS = PATH_ROOT . '\Interface\AddOns';
 const PATH_WTF = PATH_ROOT . '\WTF';
@@ -60,7 +62,7 @@ if (!$gameVersion) {
   die("No game version found");
 }
 
-function get($url) {
+function get($url, $withKey = true) {
   global $KEY;
   
   $ch = curl_init();
@@ -71,19 +73,22 @@ function get($url) {
   
   curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
   curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 
-  $headers = [
-      'User-Agent: Php wow addon updater 0.0.1',
-      'Accept: application/json',
-      'x-api-key: ' . $KEY,
-  ];
+  if ($withKey) {
+    $headers = [
+        'User-Agent: Php wow addon updater 0.0.1',
+        'Accept: application/json',
+        'x-api-key: ' . $KEY,
+    ];
 
-  curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+  }
 
   $server_output = curl_exec($ch);
   
   if (!$server_output) {
-    die('Curl error: ' . curl_error($ch) . " on {$url}\n");
+    die('Curl error: <' . curl_error($ch) . "> on {$url}\n");
   }
 
   curl_close($ch);
@@ -93,7 +98,6 @@ function get($url) {
 
 $games = get(URL_GAMES);
 $games = json_decode($games, true);
-// echo json_encode($games, JSON_PRETTY_PRINT);
 
 foreach ($games['data'] ?? [] as $game) {
   if (($game['name'] ?? '') == 'World of Warcraft') {
@@ -201,7 +205,7 @@ function getModId($name) {
   
   $mods = get(URL_SEARCH_MOD . $query);
   $mods = json_decode($mods, true);
-  // var_dump(json_encode($mods, JSON_PRETTY_PRINT));
+  // var_dump($mods);
   
   // Полное совпадение имени
   foreach ($mods['data'] ?? [] as $mod) {
@@ -217,14 +221,46 @@ function getModId($name) {
   return null;
 }
 
-//var_dump(getModId("Scrap"));
-//die;
+// var_dump(getModId("Shadowed Unit Frames"));
+// die;
+
+function getDownload($file) {
+  $download = $file['downloadUrl'] ?? "";
+  if (!$download) {
+    $download = URL_DOWNLOAD . substr($file['id'] ?? 'noid', 0, 4) . "/" . substr($file['id'] ?? '    nid', 4, 3) . "/" . ($file['fileName'] ?? '')
+      . "?not-sure-url";
+  }
+  
+  return $download;
+}
 
 
+function updateMod($url, $filename) {
+  $fullfilename = PATH_ADDONS . "\\{$filename}";
+  echo "  Downloading to {$fullfilename}...\n";
+
+  $file = get($url, false);
+  file_put_contents($fullfilename, $file);
+  
+  $zip = new ZipArchive;
+  if ($zip->open($fullfilename) === true) {
+      $zip->extractTo(PATH_ADDONS);
+      $zip->close();
+      echo "  Unzip complate\n";
+  } else {
+      echo "  Unzip ERROR\n";
+  }
+  
+  unlink($fullfilename);
+}
+
+$index = 0;
 foreach ($addonNames as $name => $version) {
   echo "{$name} local:[$version]\n";
 
   $mod = getModId($name);
+  
+  echo "  remote_name: " . ($mod['name'] ?? 'Has no name') . "\n";
   
   $files = $mod['latestFiles'] ?? [];
   // var_dump($files);
@@ -236,19 +272,26 @@ foreach ($addonNames as $name => $version) {
       continue;
     }
     // var_dump($file); echo "\n\n\n";
+
+    $releaseType = $file['releaseType'] ?? 0;
+    if ($releaseType <> 1) {
+      // echo "  releaseType={$releaseType}\n";
+      continue;
+    }
+  
     
-    $fileVersion = $file["displayName"] ?? 'EMPTY_URL';
-    
+    $fileVersion = $file["displayName"] ?? 'EMPTY_URL';    
     echo "  remote:[$fileVersion] ";
     
     if ($fileVersion <> $version) {
-      $download = $file['downloadUrl'] ?? "";
-      echo "has update -> {$download}";
+      $download = getDownload($file);
+      echo "has update -> {$download}, updating...\n";
+      $index++;
+      updateMod($download, $file['fileName'] ?? ($index . '.zip'));
     }
     else {
-      echo "has NO update";
+      echo "has NO update\n";
     }
-    echo "\n";
     
     // break;    
   }
