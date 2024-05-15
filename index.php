@@ -203,16 +203,26 @@ function getModId($name) {
   $mods = json_decode($mods, true);
   // var_dump(json_encode($mods, JSON_PRETTY_PRINT));
   
+  // Полное совпадение имени
   foreach ($mods['data'] ?? [] as $mod) {
-    if (($mod['name'] ?? '') == $name) 
+     if (($mod['name'] ?? '') == $name) 
       return $mod;
   }
   
+  // Возвращаю первого
+  foreach ($mods['data'] ?? [] as $mod) {
+      return $mod;
+  }
+
   return null;
 }
 
+//var_dump(getModId("Scrap"));
+//die;
+
+
 foreach ($addonNames as $name => $version) {
-  echo "{$name} local:[$version] ";
+  echo "{$name} local:[$version]\n";
 
   $mod = getModId($name);
   
@@ -221,28 +231,27 @@ foreach ($addonNames as $name => $version) {
   
   foreach ($files as $file) {
     $fileGameVersion = $file['gameVersions'] ?? [];
-    if (in_array($gameVersion, $fileGameVersion)) {
-      // var_dump($file); echo "\n\n\n";
-      
-      $fileVersion = $file["displayName"] ?? '';
-      
-      echo "remote:[$fileVersion] ";
-      
-      if ($fileVersion <> $version) {
-        $download = $file['downloadUrl'] ?? "";
-        echo "has update -> {$download}";
-      }
-      else {
-        echo "has NO update";
-      }
-      
-      break;
+    if (!in_array($gameVersion, $fileGameVersion)) {
+      // echo "  bad remote game version: " . json_encode($fileGameVersion) . "\n";
+      continue;
     }
+    // var_dump($file); echo "\n\n\n";
+    
+    $fileVersion = $file["displayName"] ?? 'EMPTY_URL';
+    
+    echo "  remote:[$fileVersion] ";
+    
+    if ($fileVersion <> $version) {
+      $download = $file['downloadUrl'] ?? "";
+      echo "has update -> {$download}";
+    }
+    else {
+      echo "has NO update";
+    }
+    echo "\n";
+    
+    // break;    
   }
-  
-  echo "\n";
-  
-  // echo $version . "\n";
   
   // break;
 }
