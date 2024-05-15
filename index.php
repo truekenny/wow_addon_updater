@@ -39,6 +39,32 @@ const SKIP_IF_NO_HEADER = [
   '## Version: ',
 ];
 
+function backup() {
+  $file = PATH_ADDONS . "\..\bu-" . date('Y-m-d_H-i-s') . ".zip";
+  echo "Backup to {$file}...\n";
+  
+  $zip = new ZipArchive();
+  $zip->open($file, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+  
+  $files = new RecursiveIteratorIterator(
+    new RecursiveDirectoryIterator(PATH_ADDONS),
+    RecursiveIteratorIterator::LEAVES_ONLY
+  );
+  
+  foreach ($files as $file) {
+      if (!$file->isDir()) {
+          $filePath = $file->getRealPath();
+          $relativePath = substr($filePath, strlen(PATH_ADDONS) + 1);
+          $zip->addFile($filePath, $relativePath);
+      }
+  }
+
+  $zip->close();
+  echo "Backup finished.\n\n";
+}
+
+backup();
+
 $KEY = file_get_contents('key.txt');
 $GAME_ID_WOW = null;
 
@@ -292,9 +318,7 @@ foreach ($addonNames as $name => $version) {
     else {
       echo "has NO update\n";
     }
-    
-    // break;    
-  }
+  } // files
   
-  // break;
-}
+  echo "\n\n";
+} // addon names
