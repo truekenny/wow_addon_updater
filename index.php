@@ -43,6 +43,9 @@ define('SCRIPT_DIR', dirname($_SERVER['SCRIPT_FILENAME']));
 define('VERSIONS_FILE', SCRIPT_DIR . '\versions.txt');
 
 function backup() {
+  if (defined('BACKUPED')) return;
+  define('BACKUPED', 1);
+
   $file = PATH_ADDONS . "\..\bu-" . date('Y-m-d_H-i-s') . ".zip";
   echo "Backup to {$file}...\n";
   
@@ -68,8 +71,6 @@ function backup() {
   $zip->close();
   echo "Backup finished.\n\n";
 }
-
-backup();
 
 define('KEY', trim(file_get_contents(SCRIPT_DIR . '\key.txt')));
 
@@ -323,21 +324,21 @@ foreach ($addonNames as $name => $version) {
       // echo "  releaseType={$releaseType}\n";
       continue;
     }
-  
-    
+
     $fileVersion = $file["displayName"] ?? 'EMPTY_URL';    
-    echo "  remote:[$fileVersion] ";
     
     if ($fileVersion <> $version) {
+      backup();
+      
       $download = getDownload($file);
-      echo "has update -> {$download}, updating...\n";
+      echo "  remote:[$fileVersion] has update -> {$download}, updating...\n";
       $index++;
       $addonNames[$name] = $fileVersion;
       $log[count($log) + 1] = "Updated [$name]\tfrom [$version]\tto [$fileVersion]";
       updateMod($download, $file['fileName'] ?? ($index . '.zip'));
     }
     else {
-      echo "has NO update\n";
+      echo "  remote:[$fileVersion] has NO update\n";
     }
   } // files
   
