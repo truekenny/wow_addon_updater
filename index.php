@@ -51,11 +51,14 @@ function backup() {
     RecursiveIteratorIterator::LEAVES_ONLY
   );
   
+  $index = 0;
   foreach ($files as $file) {
       if (!$file->isDir()) {
           $filePath = $file->getRealPath();
           $relativePath = substr($filePath, strlen(PATH_ADDONS) + 1);
           $zip->addFile($filePath, $relativePath);
+          $zip->setCompressionIndex($index, ZipArchive::CM_STORE);
+          $index++;
       }
   }
 
@@ -65,7 +68,7 @@ function backup() {
 
 backup();
 
-$KEY = file_get_contents('key.txt');
+$KEY = file_get_contents(dirname($_SERVER['SCRIPT_FILENAME']) . '\key.txt');
 $GAME_ID_WOW = null;
 
 function getGameVersion() {
