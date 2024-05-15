@@ -39,6 +39,9 @@ const SKIP_IF_NO_HEADER = [
   '## Version: ',
 ];
 
+define('SCRIPT_DIR', dirname($_SERVER['SCRIPT_FILENAME']));
+define('VERSIONS_FILE', SCRIPT_DIR . '\versions.txt');
+
 function backup() {
   $file = PATH_ADDONS . "\..\bu-" . date('Y-m-d_H-i-s') . ".zip";
   echo "Backup to {$file}...\n";
@@ -68,7 +71,7 @@ function backup() {
 
 backup();
 
-$KEY = file_get_contents(dirname($_SERVER['SCRIPT_FILENAME']) . '\key.txt');
+$KEY = file_get_contents(SCRIPT_DIR . '\key.txt');
 $GAME_ID_WOW = null;
 
 function getGameVersion() {
@@ -283,6 +286,23 @@ function updateMod($url, $filename) {
   unlink($fullfilename);
 }
 
+function freshLocalVersionFromDisk($addonNames) {
+  if (!file_exists(VERSIONS_FILE)) {
+    return $addonNames;
+  }
+
+  $versions = file_get_contents(VERSIONS_FILE);
+  $versions = json_decode($versions, true);
+
+  foreach ($addonNames as $name => $version) {
+    $addonNames[$name] = $versions[$name] ?? $addonNames[$name];
+  }
+  
+  return $addonNames;
+}
+
+$addonNames = freshLocalVersionFromDisk($addonNames);
+
 $index = 0;
 foreach ($addonNames as $name => $version) {
   echo "{$name} local:[$version]\n";
@@ -316,6 +336,7 @@ foreach ($addonNames as $name => $version) {
       $download = getDownload($file);
       echo "has update -> {$download}, updating...\n";
       $index++;
+      $addonNames[$name] = $fileVersion;
       updateMod($download, $file['fileName'] ?? ($index . '.zip'));
     }
     else {
@@ -325,3 +346,5 @@ foreach ($addonNames as $name => $version) {
   
   echo "\n\n";
 } // addon names
+
+file_put_contents(VERSIONS_FILE, json_encode($addonNames, JSON_PRETTY_PRINT));
