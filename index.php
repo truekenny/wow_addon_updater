@@ -71,8 +71,7 @@ function backup() {
 
 backup();
 
-$KEY = file_get_contents(SCRIPT_DIR . '\key.txt');
-$GAME_ID_WOW = null;
+define('KEY', trim(file_get_contents(SCRIPT_DIR . '\key.txt')));
 
 function getGameVersion() {
   $lines = file(PATH_WTF . '\Config.wtf');
@@ -95,8 +94,6 @@ if (!$gameVersion) {
 }
 
 function get($url, $withKey = true) {
-  global $KEY;
-  
   $ch = curl_init();
   curl_setopt($ch, CURLOPT_URL, $url);
   // curl_setopt($ch, CURLOPT_POST, 1);
@@ -111,7 +108,7 @@ function get($url, $withKey = true) {
     $headers = [
         'User-Agent: Php wow addon updater 0.0.1',
         'Accept: application/json',
-        'x-api-key: ' . $KEY,
+        'x-api-key: ' . KEY,
     ];
 
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
@@ -133,14 +130,13 @@ $games = json_decode($games, true);
 
 foreach ($games['data'] ?? [] as $game) {
   if (($game['name'] ?? '') == 'World of Warcraft') {
-    $GAME_ID_WOW = $game['id'] ?? null;
-    // echo "GAME_ID_WOW = {$GAME_ID_WOW}\n";
+    define('GAME_ID_WOW', $game['id'] ?? null);
     
     break;
   }
 }
 
-if (!$GAME_ID_WOW) {
+if (!defined('GAME_ID_WOW')) {
   die("GAME_ID_WOW not found\n");
 }
 
@@ -232,8 +228,7 @@ function getAddons() {
 $addonNames = getAddons();
 
 function getModId($name) {
-  global $GAME_ID_WOW;
-  $query = http_build_query(['gameId' => $GAME_ID_WOW, 'searchFilter' => $name, 'sortField' => 2, 'sortOrder' => 'desc']); // 2 - popular
+  $query = http_build_query(['gameId' => GAME_ID_WOW, 'searchFilter' => $name, 'sortField' => 2, 'sortOrder' => 'desc']); // 2 - popular
   
   $mods = get(URL_SEARCH_MOD . $query);
   $mods = json_decode($mods, true);
