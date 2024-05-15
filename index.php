@@ -298,6 +298,7 @@ function freshLocalVersionFromDisk($addonNames) {
 
 $addonNames = freshLocalVersionFromDisk($addonNames);
 
+$log = [];
 $index = 0;
 foreach ($addonNames as $name => $version) {
   echo "{$name} local:[$version]\n";
@@ -332,6 +333,7 @@ foreach ($addonNames as $name => $version) {
       echo "has update -> {$download}, updating...\n";
       $index++;
       $addonNames[$name] = $fileVersion;
+      $log[count($log) + 1] = "Updated [$name]\tfrom [$version]\tto [$fileVersion]";
       updateMod($download, $file['fileName'] ?? ($index . '.zip'));
     }
     else {
@@ -343,3 +345,8 @@ foreach ($addonNames as $name => $version) {
 } // addon names
 
 file_put_contents(VERSIONS_FILE, json_encode($addonNames, JSON_PRETTY_PRINT));
+
+// short log
+foreach($log as $index => $line) {
+  echo "$index. $line\n";
+}
