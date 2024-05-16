@@ -45,6 +45,8 @@ const FILE_DO_NOT_UPDATE = 'DO_NOT_UPDATE';
 
 define('SCRIPT_DIR', dirname($_SERVER['SCRIPT_FILENAME']));
 define('VERSIONS_FILE', SCRIPT_DIR . '\versions.txt');
+define('KEY', trim(file_get_contents(SCRIPT_DIR . '\key.txt')));
+define('UNFOUND_ADDONS_FILE', SCRIPT_DIR . '\unfound.txt');
 
 function backup() {
   if (defined('BACKUPED')) return;
@@ -75,8 +77,6 @@ function backup() {
   $zip->close();
   echo "Backup finished.\n\n";
 }
-
-define('KEY', trim(file_get_contents(SCRIPT_DIR . '\key.txt')));
 
 function getGameVersion() {
   $lines = file(PATH_WTF . '\Config.wtf');
@@ -236,6 +236,25 @@ function getAddons() {
 }
 
 $addonNames = getAddons();
+
+function addUnfoundAddons($addonNames) {
+  if (!file_exists(UNFOUND_ADDONS_FILE)) { 
+    return $addonNames;
+  }
+  
+  $unfounds = file(UNFOUND_ADDONS_FILE);
+  $unfounds = array_map('trim', $unfounds);
+  
+  foreach($unfounds as $unfound) {
+    if (empty($unfound)) continue;
+  
+    $addonNames[$unfound] = 'no version';
+  }
+  
+  return $addonNames;
+}
+
+$addonNames = addUnfoundAddons($addonNames);
 
 function getModId($name) {
   $query = http_build_query(['gameId' => GAME_ID_WOW, 'searchFilter' => $name, 'sortField' => 2, 'sortOrder' => 'desc']); // 2 - popular
