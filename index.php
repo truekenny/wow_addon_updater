@@ -6,6 +6,8 @@
  * mv `php.ini-develop` to `php.ini`
  * uncomment `extension=curl`
  * uncomment `extension=zip`
+ *
+ * touch file DO_NOT_UPDATE in addon folder
  */
 
 const PATH_ROOT = 'C:\Program Files (x86)\World of Warcraft\_retail_';
@@ -38,6 +40,8 @@ const SKIP_IF_NAME = [
 const SKIP_IF_NO_HEADER = [
   '## Version: ',
 ];
+
+const FILE_DO_NOT_UPDATE = 'DO_NOT_UPDATE';
 
 define('SCRIPT_DIR', dirname($_SERVER['SCRIPT_FILENAME']));
 define('VERSIONS_FILE', SCRIPT_DIR . '\versions.txt');
@@ -151,6 +155,11 @@ function getAddons() {
     if (substr($folder, 0, 1) == '.') continue;
     $fullPath = PATH_ADDONS . "\\" . $folder;
     if (!is_dir($fullPath)) continue;
+    
+    if (file_exists($fullPath . "\\" . FILE_DO_NOT_UPDATE)) {
+      echo "$folder skip by DO_NOT_UPDATE\n\n";
+      continue;
+    }
     
     // $skipFolder = false;
 
