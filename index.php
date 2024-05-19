@@ -48,36 +48,7 @@ define('VERSIONS_FILE', SCRIPT_DIR . '\versions.txt');
 define('KEY', trim(file_get_contents(SCRIPT_DIR . '\key.txt')));
 define('UNFOUND_ADDONS_FILE', SCRIPT_DIR . '\unfound.txt');
 
-function backup() {
-  if (defined('BACKUPED')) return;
-  define('BACKUPED', 1);
-
-  $file = PATH_ADDONS . "\..\bu-" . date('Y-m-d_H-i-s') . ".zip";
-  echo "Backup to {$file}...\n";
-  
-  $zip = new ZipArchive();
-  $zip->open($file, ZipArchive::CREATE | ZipArchive::OVERWRITE);
-  
-  $files = new RecursiveIteratorIterator(
-    new RecursiveDirectoryIterator(PATH_ADDONS),
-    RecursiveIteratorIterator::LEAVES_ONLY
-  );
-  
-  $index = 0;
-  foreach ($files as $file) {
-      if (!$file->isDir()) {
-          $filePath = $file->getRealPath();
-          $relativePath = substr($filePath, strlen(PATH_ADDONS) + 1);
-          $zip->addFile($filePath, $relativePath);
-          $zip->setCompressionIndex($index, ZipArchive::CM_STORE);
-          $index++;
-      }
-  }
-
-  $zip->close();
-  echo "Backup finished.\n\n";
-}
-
+// Устанавливает GAME_VERSION
 function getGameVersion() {
   $lines = file(PATH_WTF . '\Config.wtf');
   
@@ -86,18 +57,17 @@ function getGameVersion() {
       $version = trim(str_replace(WTF_GAME_VERSION, '', $line), " \n\r\t\v\x00\"");
       // echo "game version={$version}\n";
       
-      return intval(substr($version, 0, 2)) . "." . intval(substr($version, 2, 2)) . "." . intval(substr($version, 4, 2));
+      define('GAME_VERSION', intval(substr($version, 0, 2)) . "." . intval(substr($version, 2, 2)) . "." . intval(substr($version, 4, 2)));
+      return ;
     }
   }
   
-  return null;
-}
-
-$gameVersion = getGameVersion();
-if (!$gameVersion) {
   die("No game version found");
 }
 
+getGameVersion();
+
+// Выполняет HTTP запрос и возвращает содержимое
 function get($url, $withKey = true) {
   $ch = curl_init();
   curl_setopt($ch, CURLOPT_URL, $url);
@@ -130,21 +100,25 @@ function get($url, $withKey = true) {
   return $server_output;
 }
 
-$games = get(URL_GAMES);
-$games = json_decode($games, true);
+// Устанавливает GAME_ID_WOW
+function getGameId() {
+  $games = get(URL_GAMES);
+  $games = json_decode($games, true);
 
-foreach ($games['data'] ?? [] as $game) {
-  if (($game['name'] ?? '') == 'World of Warcraft') {
-    define('GAME_ID_WOW', $game['id'] ?? null);
-    
-    break;
+  foreach ($games['data'] ?? [] as $game) {
+    if (($game['name'] ?? '') == 'World of Warcraft') {
+      define('GAME_ID_WOW', $game['id'] ?? null);
+      
+      return;
+    }
   }
-}
-
-if (!defined('GAME_ID_WOW')) {
+  
   die("GAME_ID_WOW not found\n");
 }
 
+getGameId();
+
+// Возвращает имя-версия из каталога с аддонами
 function getAddons() {
   $names = [];
 
@@ -237,6 +211,7 @@ function getAddons() {
 
 $addonNames = getAddons();
 
+// Добавляет имена аддонов без установленной версии из файла UNFOUND_ADDONS_FILE
 function addUnfoundAddons($addonNames) {
   if (!file_exists(UNFOUND_ADDONS_FILE)) { 
     return $addonNames;
@@ -256,7 +231,26 @@ function addUnfoundAddons($addonNames) {
 
 $addonNames = addUnfoundAddons($addonNames);
 
-function getModId($name) {
+// Обновляет версии аддонов в массиве взятых из предыдущих обновлений аддонов
+function freshLocalVersionFromDisk($addonNames) {
+  if (!file_exists(VERSIONS_FILE)) {
+    return $addonNames;
+  }
+
+  $versions = file_get_contents(VERSIONS_FILE);
+  $versions = json_decode($versions, true);
+
+  foreach ($addonNames as $name => $version) {
+    $addonNames[$name] = $versions[$name] ?? $addonNames[$name];
+  }
+  
+  return $addonNames;
+}
+
+$addonNames = freshLocalVersionFromDisk($addonNames);
+
+// Возвращает информацию о моде по имени
+function getMod($name) {
   $query = http_build_query(['gameId' => GAME_ID_WOW, 'searchFilter' => $name, 'sortField' => 2, 'sortOrder' => 'desc']); // 2 - popular
   
   $mods = get(URL_SEARCH_MOD . $query);
@@ -277,9 +271,38 @@ function getModId($name) {
   return null;
 }
 
-// var_dump(getModId("Shadowed Unit Frames"));
-// die;
+// Делает резервную версию перед обновлением аддона
+function backup() {
+  if (defined('BACKUPED')) return;
+  define('BACKUPED', 1);
 
+  $file = PATH_ADDONS . "\..\bu-" . date('Y-m-d_H-i-s') . ".zip";
+  echo "Backup to {$file}...\n";
+  
+  $zip = new ZipArchive();
+  $zip->open($file, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+  
+  $files = new RecursiveIteratorIterator(
+    new RecursiveDirectoryIterator(PATH_ADDONS),
+    RecursiveIteratorIterator::LEAVES_ONLY
+  );
+  
+  $index = 0;
+  foreach ($files as $file) {
+      if (!$file->isDir()) {
+          $filePath = $file->getRealPath();
+          $relativePath = substr($filePath, strlen(PATH_ADDONS) + 1);
+          $zip->addFile($filePath, $relativePath);
+          $zip->setCompressionIndex($index, ZipArchive::CM_STORE);
+          $index++;
+      }
+  }
+
+  $zip->close();
+  echo "Backup finished.\n\n";
+}
+
+// Скачивает файл по ссылке
 function getDownload($file) {
   $download = $file['downloadUrl'] ?? "";
   if (!$download) {
@@ -290,7 +313,7 @@ function getDownload($file) {
   return $download;
 }
 
-
+// Обновление аддона из ссылки через временным файл
 function updateMod($url, $filename) {
   $fullfilename = PATH_ADDONS . "\\{$filename}";
   echo "  Downloading to {$fullfilename}...\n";
@@ -310,70 +333,60 @@ function updateMod($url, $filename) {
   unlink($fullfilename);
 }
 
-function freshLocalVersionFromDisk($addonNames) {
-  if (!file_exists(VERSIONS_FILE)) {
-    return $addonNames;
-  }
-
-  $versions = file_get_contents(VERSIONS_FILE);
-  $versions = json_decode($versions, true);
-
+// Главный цикл перебора аддонов
+function main($addonNames) {
+  $log = [];
+  $index = 0;
   foreach ($addonNames as $name => $version) {
-    $addonNames[$name] = $versions[$name] ?? $addonNames[$name];
-  }
+    echo "{$name} local:[$version]\n";
+
+    $mod = getMod($name);
+    
+    echo "  remote_name: " . ($mod['name'] ?? 'Has no name') . "\n";
+    
+    $files = $mod['latestFiles'] ?? [];
+    // var_dump($files);
+    
+    foreach ($files as $file) {
+      $fileGameVersion = $file['gameVersions'] ?? [];
+      if (!in_array(GAME_VERSION, $fileGameVersion)) {
+        // echo "  bad remote game version: " . json_encode($fileGameVersion) . "\n";
+        continue;
+      }
+      // var_dump($file); echo "\n\n\n";
+
+      $releaseType = $file['releaseType'] ?? 0;
+      if ($releaseType <> 1) {
+        // echo "  releaseType={$releaseType}\n";
+        continue;
+      }
+
+      $fileVersion = $file["displayName"] ?? 'EMPTY_URL';    
+      
+      if ($fileVersion <> $version) {
+        backup();
+        
+        $download = getDownload($file);
+        echo "  remote:[$fileVersion] has update -> {$download}, updating...\n";
+        $index++;
+        $addonNames[$name] = $fileVersion;
+        $log[count($log) + 1] = "Updated [$name]\tfrom [$version]\tto [$fileVersion]";
+        updateMod($download, $file['fileName'] ?? ($index . '.zip'));
+      }
+      else {
+        echo "  remote:[$fileVersion] has NO update\n";
+      }
+    } // files
+    
+    echo "\n\n";
+  } // addon names
   
-  return $addonNames;
+  file_put_contents(VERSIONS_FILE, json_encode($addonNames, JSON_PRETTY_PRINT));
+  
+  return $log;
 }
 
-$addonNames = freshLocalVersionFromDisk($addonNames);
-
-$log = [];
-$index = 0;
-foreach ($addonNames as $name => $version) {
-  echo "{$name} local:[$version]\n";
-
-  $mod = getModId($name);
-  
-  echo "  remote_name: " . ($mod['name'] ?? 'Has no name') . "\n";
-  
-  $files = $mod['latestFiles'] ?? [];
-  // var_dump($files);
-  
-  foreach ($files as $file) {
-    $fileGameVersion = $file['gameVersions'] ?? [];
-    if (!in_array($gameVersion, $fileGameVersion)) {
-      // echo "  bad remote game version: " . json_encode($fileGameVersion) . "\n";
-      continue;
-    }
-    // var_dump($file); echo "\n\n\n";
-
-    $releaseType = $file['releaseType'] ?? 0;
-    if ($releaseType <> 1) {
-      // echo "  releaseType={$releaseType}\n";
-      continue;
-    }
-
-    $fileVersion = $file["displayName"] ?? 'EMPTY_URL';    
-    
-    if ($fileVersion <> $version) {
-      backup();
-      
-      $download = getDownload($file);
-      echo "  remote:[$fileVersion] has update -> {$download}, updating...\n";
-      $index++;
-      $addonNames[$name] = $fileVersion;
-      $log[count($log) + 1] = "Updated [$name]\tfrom [$version]\tto [$fileVersion]";
-      updateMod($download, $file['fileName'] ?? ($index . '.zip'));
-    }
-    else {
-      echo "  remote:[$fileVersion] has NO update\n";
-    }
-  } // files
-  
-  echo "\n\n";
-} // addon names
-
-file_put_contents(VERSIONS_FILE, json_encode($addonNames, JSON_PRETTY_PRINT));
+$log = main($addonNames);
 
 // short log
 foreach($log as $index => $line) {
