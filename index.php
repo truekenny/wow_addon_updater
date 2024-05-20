@@ -11,6 +11,11 @@
  */
 
 const PATH_ROOT = 'C:\Program Files (x86)\World of Warcraft\_retail_';
+
+if (!is_dir(PATH_ROOT)) {
+  die("Path is not valid, " . PATH_ROOT . "\n");
+}
+
 const URL_DOWNLOAD = 'https://mediafilez.forgecdn.net/files/';
 
 const PATH_ADDONS = PATH_ROOT . '\Interface\AddOns';
@@ -45,12 +50,20 @@ const FILE_DO_NOT_UPDATE = 'DO_NOT_UPDATE';
 
 define('SCRIPT_DIR', dirname($_SERVER['SCRIPT_FILENAME']));
 define('VERSIONS_FILE', SCRIPT_DIR . '\versions.txt');
-define('KEY', trim(file_get_contents(SCRIPT_DIR . '\key.txt')));
+$keyFilename = SCRIPT_DIR . '\key.txt';
+if (!file_exists($keyFilename)) {
+  die("File with curse api key not found, {$keyFilename}\n");
+}
+define('KEY', trim(file_get_contents($keyFilename)));
 define('UNFOUND_ADDONS_FILE', SCRIPT_DIR . '\unfound.txt');
 
 // Устанавливает GAME_VERSION
 function getGameVersion() {
-  $lines = file(PATH_WTF . '\Config.wtf');
+  $configFilename = PATH_WTF . '\Config.wtf';
+  if (!file_exists($configFilename)) {
+    die("File not found, {$configFilename}\n");
+  }
+  $lines = file($configFilename);
   
   foreach ($lines as $line) {
     if (strpos($line, WTF_GAME_VERSION) !== false) {
