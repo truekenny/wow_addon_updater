@@ -1,3 +1,3 @@
-php index.php
+c:\php\php index.php
 
 pause

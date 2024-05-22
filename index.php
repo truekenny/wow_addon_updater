@@ -1,15 +1,5 @@
 <?php
 
-/**
- * `https://windows.php.net/download/`
- * unpack to `c:\php`
- * mv `php.ini-develop` to `php.ini`
- * uncomment `extension=curl`
- * uncomment `extension=zip`
- *
- * touch file DO_NOT_UPDATE in addon folder
- */
-
 const PATH_ROOT = 'C:\Program Files (x86)\World of Warcraft\_retail_';
 
 if (!is_dir(PATH_ROOT)) {
