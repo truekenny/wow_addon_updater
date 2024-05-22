@@ -18,8 +18,8 @@ if (!is_dir(PATH_ROOT)) {
 
 const URL_DOWNLOAD = 'https://mediafilez.forgecdn.net/files/';
 
-const PATH_ADDONS = PATH_ROOT . '\Interface\AddOns';
-const PATH_WTF = PATH_ROOT . '\WTF';
+const PATH_ADDONS = PATH_ROOT . DIRECTORY_SEPARATOR . 'Interface' . DIRECTORY_SEPARATOR . 'AddOns';
+const PATH_WTF = PATH_ROOT . DIRECTORY_SEPARATOR . 'WTF';
 
 const URL_ROOT = 'https://api.curseforge.com';
 const URL_GAMES = URL_ROOT . '/v1/games';
@@ -49,17 +49,17 @@ const SKIP_IF_NO_HEADER = [
 const FILE_DO_NOT_UPDATE = 'DO_NOT_UPDATE';
 
 define('SCRIPT_DIR', dirname($_SERVER['SCRIPT_FILENAME']));
-define('VERSIONS_FILE', SCRIPT_DIR . '\versions.txt');
-$keyFilename = SCRIPT_DIR . '\key.txt';
+define('VERSIONS_FILE', SCRIPT_DIR . DIRECTORY_SEPARATOR . 'versions.txt');
+$keyFilename = SCRIPT_DIR . DIRECTORY_SEPARATOR . 'key.txt';
 if (!file_exists($keyFilename)) {
   die("File with curse api key not found, {$keyFilename}\n");
 }
 define('KEY', trim(file_get_contents($keyFilename)));
-define('UNFOUND_ADDONS_FILE', SCRIPT_DIR . '\unfound.txt');
+define('UNFOUND_ADDONS_FILE', SCRIPT_DIR . DIRECTORY_SEPARATOR . 'unfound.txt');
 
 // Устанавливает GAME_VERSION
 function getGameVersion() {
-  $configFilename = PATH_WTF . '\Config.wtf';
+  $configFilename = PATH_WTF . DIRECTORY_SEPARATOR . 'Config.wtf';
   if (!file_exists($configFilename)) {
     die("File not found, {$configFilename}\n");
   }
@@ -140,10 +140,10 @@ function getAddons() {
     // echo "{$folder}\n";
   
     if (substr($folder, 0, 1) == '.') continue;
-    $fullPath = PATH_ADDONS . "\\" . $folder;
+    $fullPath = PATH_ADDONS . DIRECTORY_SEPARATOR . $folder;
     if (!is_dir($fullPath)) continue;
     
-    if (file_exists($fullPath . "\\" . FILE_DO_NOT_UPDATE)) {
+    if (file_exists($fullPath . DIRECTORY_SEPARATOR . FILE_DO_NOT_UPDATE)) {
       echo "$folder skip by DO_NOT_UPDATE\n\n";
       continue;
     }
@@ -158,7 +158,7 @@ function getAddons() {
       // echo "  {$file}\n";
 
       if (substr($file, 0, 1) == '.') continue;
-      $fullPathFile = PATH_ADDONS . "\\" . $folder . "\\" . $file;
+      $fullPathFile = PATH_ADDONS . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR . $file;
       if (is_dir($fullPathFile)) continue;
       
       $ext = pathinfo($fullPathFile, PATHINFO_EXTENSION);
@@ -289,7 +289,7 @@ function backup() {
   if (defined('BACKUPED')) return;
   define('BACKUPED', 1);
 
-  $file = PATH_ADDONS . "\..\bu-" . date('Y-m-d_H-i-s') . ".zip";
+  $file = PATH_ADDONS . DIRECTORY_SEPARATOR . ".." . DIRECTORY_SEPARATOR . "bu-" . date('Y-m-d_H-i-s') . ".zip";
   echo "Backup to {$file}...\n";
   
   $zip = new ZipArchive();
@@ -328,7 +328,7 @@ function getDownload($file) {
 
 // Обновление аддона из ссылки через временным файл
 function updateMod($url, $filename) {
-  $fullfilename = PATH_ADDONS . "\\{$filename}";
+  $fullfilename = PATH_ADDONS . DIRECTORY_SEPARATOR . "{$filename}";
   echo "  Downloading to {$fullfilename}...\n";
 
   $file = get($url, false);
