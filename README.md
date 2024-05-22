@@ -1,4 +1,6 @@
-# Wow Addon Updater via PHP
+# World of Warcraft Addon Updater via PHP
+
+![World of Warcraft Addon Updater via PHP](https://github.com/truekenny/wow_addon_updater/blob/master/title.png?raw=true)
 
 ## Install PHP (Windows)
 
