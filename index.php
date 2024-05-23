@@ -280,7 +280,7 @@ function backup() {
   define('BACKUPED', 1);
 
   $file = PATH_ADDONS . DIRECTORY_SEPARATOR . ".." . DIRECTORY_SEPARATOR . "bu-" . date('Y-m-d_H-i-s') . ".zip";
-  echo "Backup to {$file}...\n";
+  echo "    Backup to {$file}...\n";
   
   $zip = new ZipArchive();
   $zip->open($file, ZipArchive::CREATE | ZipArchive::OVERWRITE);
@@ -302,7 +302,7 @@ function backup() {
   }
 
   $zip->close();
-  echo "Backup finished.\n\n";
+  echo "    Backup finished.\n";
 }
 
 // Скачивает файл по ссылке
