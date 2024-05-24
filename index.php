@@ -38,6 +38,11 @@ const SKIP_IF_NO_HEADER = [
 
 const FILE_DO_NOT_UPDATE = 'DO_NOT_UPDATE';
 
+const REMOVE_FROM_NAME = [
+  '/\|r/',
+  '/\|c.{8}/',
+];
+
 define('SCRIPT_DIR', dirname($_SERVER['SCRIPT_FILENAME']));
 define('VERSIONS_FILE', SCRIPT_DIR . DIRECTORY_SEPARATOR . 'versions.txt');
 $keyFilename = SCRIPT_DIR . DIRECTORY_SEPARATOR . 'key.txt';
@@ -163,6 +168,10 @@ function getAddons() {
       foreach ($lines as $line) {
         if (strpos($line, HEADER_TITLE) !== false) {
           $name = trim(str_replace(HEADER_TITLE, '', $line));
+          
+          foreach (REMOVE_FROM_NAME as $badString) {
+            $name = preg_replace($badString, '', $name);
+          }
           // echo "    name={$name}\n";
         }
        
@@ -173,7 +182,7 @@ function getAddons() {
          
         foreach (SKIP_IF_HEADER as $badHeader) {
           if (strpos($line, $badHeader) !== false) {
-            // echo "      badHeader {$badHeader}\n";
+            // echo "      badHeader {$badHeader}, $fullPathFile\n";
             break 3;
           }
         }
