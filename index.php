@@ -311,7 +311,7 @@ function removeOldBackups() {
   foreach ($zips as $zip) {
     if (filectime($zip) > time() - STORE_BACKUP_SECONDS) continue;
     
-    echo "    Old backup removed: {$zip}\n";
+    echo "Old backup removed: {$zip}\n";
     unlink($zip);
   }
 }
