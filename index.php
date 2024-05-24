@@ -43,6 +43,12 @@ const REMOVE_FROM_NAME = [
   '/\|c.{8}/',
 ];
 
+const BACKUP_DIR = PATH_ADDONS . DIRECTORY_SEPARATOR . ".." . DIRECTORY_SEPARATOR;
+
+const REMOVE_OLD_BACKUPS = true;
+
+const STORE_BACKUP_SECONDS = 5 * 24 * 3600; // 5 days
+
 define('SCRIPT_DIR', dirname($_SERVER['SCRIPT_FILENAME']));
 define('VERSIONS_FILE', SCRIPT_DIR . DIRECTORY_SEPARATOR . 'versions.txt');
 $keyFilename = SCRIPT_DIR . DIRECTORY_SEPARATOR . 'key.txt';
@@ -283,12 +289,41 @@ function getMod($name) {
   return null;
 }
 
+// Удаляет старые резервние копии
+function removeOldBackups() {
+  if (!REMOVE_OLD_BACKUPS) return;
+
+  $zips = [];
+  $files = scandir(BACKUP_DIR);
+  foreach ($files as $file) {
+    $fullPathFile = BACKUP_DIR . $file;
+    if (!is_file($fullPathFile)) continue;
+    
+    $ext = pathinfo($fullPathFile, PATHINFO_EXTENSION);
+    if ($ext <> 'zip') continue;
+    
+    $zips[] = $fullPathFile;
+  }
+  
+  sort($zips);
+  $zips = array_slice($zips, 0, count($zips) - 1 - 2); // anyway store last 2 backup
+
+  foreach ($zips as $zip) {
+    if (filectime($zip) > time() - STORE_BACKUP_SECONDS) continue;
+    
+    echo "    Old backup removed: {$zip}\n";
+    unlink($zip);
+  }
+}
+
+removeOldBackups();
+
 // Делает резервную версию перед обновлением аддона
 function backup() {
   if (defined('BACKUPED')) return;
   define('BACKUPED', 1);
 
-  $file = PATH_ADDONS . DIRECTORY_SEPARATOR . ".." . DIRECTORY_SEPARATOR . "bu-" . date('Y-m-d_H-i-s') . ".zip";
+  $file = BACKUP_DIR . "bu-" . date('Y-m-d_H-i-s') . ".zip";
   echo "    Backup to {$file}...\n";
   
   $zip = new ZipArchive();
