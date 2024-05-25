@@ -278,17 +278,34 @@ function getMod($name) {
   
   // Полное совпадение имени
   foreach ($mods['data'] ?? [] as $mod) {
-     if (($mod['name'] ?? '') == $name) 
+    // echo $mod['name'], " - full\n";
+    if (($mod['name'] ?? '') == $name) 
       return $mod;
   }
   
+  // В имени на сайте есть часть из локального имени
+  foreach ($mods['data'] ?? [] as $mod) {
+    // echo $mod['name'], " - part 1\n";
+    if (strpos($mod['name'] ?? '', $name) !== false) 
+      return $mod;
+  }
+
+  // В локальном имени есть часть из имени с сайта
+  foreach ($mods['data'] ?? [] as $mod) {
+    // echo $mod['name'], " - part 2\n";
+    if (strpos($name, $mod['name'] ?? '') !== false) 
+      return $mod;
+  }
+    
   // Возвращаю первого
   foreach ($mods['data'] ?? [] as $mod) {
-      return $mod;
+    return $mod;
   }
 
   return null;
 }
+
+// $mod = getMod("Mythic Dungeon Tools"); var_dump($mod); die;
 
 // Удаляет старые резервние копии
 function removeOldBackups() {
@@ -354,8 +371,8 @@ function backup() {
   echo "    Backup finished.\n";
 }
 
-// Скачивает файл по ссылке
-function getDownload($file) {
+// Делает ссылку на аддон
+function getDownloadUrl($file) {
   $download = $file['downloadUrl'] ?? "";
   if (!$download) {
     $download = URL_DOWNLOAD . substr($file['id'] ?? 'noid', 0, 4) . "/" . substr($file['id'] ?? '    nid', 4, 3) . "/" . ($file['fileName'] ?? '')
@@ -394,12 +411,16 @@ function main($addonNames) {
 
     $mod = getMod($name);
     
-    echo "  remote_name: " . ($mod['name'] ?? 'Has no name') . "\n";
+    $modId = $mod['id'] ?? 'no';
+    echo "  remote_name: " . ($mod['name'] ?? 'Has no name') . " mod_id: $modId\n";
     
     $files = $mod['latestFiles'] ?? [];
     // var_dump($files);
     
+    $toUpdate = ['file_id' => null, 'file' => null];
     foreach ($files as $file) {
+      echo "    file: id: $file[id]\n";
+    
       $fileGameVersion = $file['gameVersions'] ?? [];
       if (!in_array(GAME_VERSION, $fileGameVersion)) {
         // echo "  bad remote game version: " . json_encode($fileGameVersion) . "\n";
@@ -412,13 +433,26 @@ function main($addonNames) {
         // echo "  releaseType={$releaseType}\n";
         continue;
       }
-
-      $fileVersion = $file["displayName"] ?? 'EMPTY_URL';    
+   
+      $fileId = $file['id'] ?? 'EMPTY_ID';
+      
+      // Забирается последний file_id
+      if (!$toUpdate['file_id'] || ($toUpdate['file_id'] < $fileId)) {
+        $toUpdate = ['file_id' => $fileId, 'file' => $file];
+        
+        $fileVersion = $file["displayName"] ?? 'EMPTY_VERSION'; 
+        echo "  toUpdate: version -> {$fileVersion}\n";
+      }
+    } // files
+    
+    if ($toUpdate['file_id']) {
+      $file = $toUpdate['file'];
+      $fileVersion = $file["displayName"] ?? 'EMPTY_VERSION';
       
       if ($fileVersion <> $version) {
         backup();
+        $download = getDownloadUrl($file);
         
-        $download = getDownload($file);
         echo "  remote:[$fileVersion] has update -> {$download}, updating...\n";
         $index++;
         $addonNames[$name] = $fileVersion;
@@ -428,7 +462,10 @@ function main($addonNames) {
       else {
         echo "  remote:[$fileVersion] has NO update\n";
       }
-    } // files
+    }
+    else {
+      echo "  remote:[empty] has NO update\n";
+    }
     
     echo "\n\n";
   } // addon names
