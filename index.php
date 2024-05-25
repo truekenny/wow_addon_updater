@@ -8,7 +8,8 @@ if (!is_dir(PATH_ROOT)) {
 
 const URL_DOWNLOAD = 'https://mediafilez.forgecdn.net/files/';
 
-const PATH_ADDONS = PATH_ROOT . DIRECTORY_SEPARATOR . 'Interface' . DIRECTORY_SEPARATOR . 'AddOns';
+const PATH_INTERFACE = PATH_ROOT . DIRECTORY_SEPARATOR . 'Interface';
+const PATH_ADDONS = PATH_INTERFACE . DIRECTORY_SEPARATOR . 'AddOns';
 const PATH_WTF = PATH_ROOT . DIRECTORY_SEPARATOR . 'WTF';
 
 const URL_ROOT = 'https://api.curseforge.com';
@@ -43,7 +44,7 @@ const REMOVE_FROM_NAME = [
   '/\|c.{8}/',
 ];
 
-const BACKUP_DIR = PATH_ADDONS . DIRECTORY_SEPARATOR . ".." . DIRECTORY_SEPARATOR;
+const BACKUP_DIR = PATH_INTERFACE . DIRECTORY_SEPARATOR;
 
 const REMOVE_OLD_BACKUPS = true;
 
@@ -308,12 +309,16 @@ function removeOldBackups() {
   sort($zips);
   $zips = array_slice($zips, 0, count($zips) - 1 - 2); // anyway store last 2 backup
 
+  $unlinked = 0;
   foreach ($zips as $zip) {
     if (filectime($zip) > time() - STORE_BACKUP_SECONDS) continue;
     
     echo "Old backup removed: {$zip}\n";
     unlink($zip);
+    $unlinked++;
   }
+  
+  if ($unlinked) echo "\n";
 }
 
 removeOldBackups();
