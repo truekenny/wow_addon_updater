@@ -346,7 +346,7 @@ function backup() {
   define('BACKUPED', 1);
 
   $file = BACKUP_DIR . "bu-" . date('Y-m-d_H-i-s') . ".zip";
-  echo "    Backup to {$file}...\n";
+  echo "      backup to {$file}...\n";
   
   $zip = new ZipArchive();
   $zip->open($file, ZipArchive::CREATE | ZipArchive::OVERWRITE);
@@ -368,7 +368,7 @@ function backup() {
   }
 
   $zip->close();
-  echo "    Backup finished.\n";
+  echo "      backup finished.\n";
 }
 
 // Делает ссылку на аддон
@@ -385,7 +385,7 @@ function getDownloadUrl($file) {
 // Обновление аддона из ссылки через временным файл
 function updateMod($url, $filename) {
   $fullfilename = PATH_ADDONS . DIRECTORY_SEPARATOR . "{$filename}";
-  echo "  Downloading to {$fullfilename}...\n";
+  echo "      downloading to {$fullfilename}...\n";
 
   $file = get($url, false);
   file_put_contents($fullfilename, $file);
@@ -394,9 +394,9 @@ function updateMod($url, $filename) {
   if ($zip->open($fullfilename) === true) {
       $zip->extractTo(PATH_ADDONS);
       $zip->close();
-      echo "  Unzip complate\n";
+      echo "      unzip complate\n";
   } else {
-      echo "  Unzip ERROR\n";
+      echo "      unzip ERROR\n";
   }
   
   unlink($fullfilename);
@@ -407,7 +407,7 @@ function main($addonNames) {
   $log = [];
   $index = 0;
   foreach ($addonNames as $name => $version) {
-    echo "{$name} local:[$version]\n";
+    echo "{$name} local: [$version]\n";
 
     $mod = getMod($name);
     
@@ -419,7 +419,7 @@ function main($addonNames) {
     
     $toUpdate = ['file_id' => null, 'file' => null];
     foreach ($files as $file) {
-      echo "    file: id: $file[id]\n";
+      echo "  file_id: $file[id]\n";
     
       $fileGameVersion = $file['gameVersions'] ?? [];
       if (!in_array(GAME_VERSION, $fileGameVersion)) {
@@ -441,7 +441,7 @@ function main($addonNames) {
         $toUpdate = ['file_id' => $fileId, 'file' => $file];
         
         $fileVersion = $file["displayName"] ?? 'EMPTY_VERSION'; 
-        echo "  toUpdate: version -> {$fileVersion}\n";
+        echo "    selected version: {$fileVersion}\n";
       }
     } // files
     
@@ -450,21 +450,22 @@ function main($addonNames) {
       $fileVersion = $file["displayName"] ?? 'EMPTY_VERSION';
       
       if ($fileVersion <> $version) {
-        backup();
         $download = getDownloadUrl($file);
-        
-        echo "  remote:[$fileVersion] has update -> {$download}, updating...\n";
+        echo "    remote: [$fileVersion] has update -> {$download}, updating...\n";
+
+        backup();
+
         $index++;
         $addonNames[$name] = $fileVersion;
         $log[count($log) + 1] = "Updated [$name]\tfrom [$version]\tto [$fileVersion]";
         updateMod($download, $file['fileName'] ?? ($index . '.zip'));
       }
       else {
-        echo "  remote:[$fileVersion] has NO update\n";
+        echo "    remote: [$fileVersion] has NO update\n";
       }
     }
     else {
-      echo "  remote:[empty] has NO update\n";
+      echo "    remote: [empty] has NO update\n";
     }
     
     echo "\n\n";
