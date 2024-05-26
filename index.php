@@ -50,6 +50,10 @@ const REMOVE_OLD_BACKUPS = true;
 
 const STORE_BACKUP_SECONDS = 5 * 24 * 3600; // 5 days
 
+const VERSION_URL = 'https://raw.githubusercontent.com/truekenny/wow_addon_updater/master/version.txt';
+
+const SOFT_URL = 'https://github.com/truekenny/wow_addon_updater';
+
 define('SCRIPT_DIR', dirname($_SERVER['SCRIPT_FILENAME']));
 define('VERSIONS_FILE', SCRIPT_DIR . DIRECTORY_SEPARATOR . 'versions.txt');
 $keyFilename = SCRIPT_DIR . DIRECTORY_SEPARATOR . 'key.txt';
@@ -58,6 +62,8 @@ if (!file_exists($keyFilename)) {
 }
 define('KEY', trim(file_get_contents($keyFilename)));
 define('UNFOUND_ADDONS_FILE', SCRIPT_DIR . DIRECTORY_SEPARATOR . 'unfound.txt');
+
+define('VERSION_FILE', SCRIPT_DIR . DIRECTORY_SEPARATOR . 'version.txt');
 
 // Устанавливает GAME_VERSION
 function getGameVersion() {
@@ -114,6 +120,22 @@ function get($url, $withKey = true) {
 
   return $server_output;
 }
+
+// Уведомляет об обновлении
+function checkVersion() {
+  if (!file_exists(VERSION_FILE)) return;
+  
+  $localVersion = trim(file_get_contents(VERSION_FILE));
+  $remoteVersion = trim(get(VERSION_URL, false));
+  
+  if ($localVersion <> $remoteVersion) {
+    echo "Another version found, local: $localVersion, remote: $remoteVersion\n";
+    echo SOFT_URL, "\n\n\n\n";
+    sleep(1);
+  }
+}
+
+checkVersion();
 
 // Устанавливает GAME_ID_WOW
 function getGameId() {
