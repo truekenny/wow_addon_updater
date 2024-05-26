@@ -305,7 +305,7 @@ function getMod($name) {
   return null;
 }
 
-// $mod = getMod("Mythic Dungeon Tools"); var_dump($mod); die;
+// $mod = getMod("DBM - Dungeons & Events (Requires Deadly Boss Mods)"); echo(json_encode($mod, JSON_PRETTY_PRINT)); die;
 
 // Удаляет старые резервние копии
 function removeOldBackups() {
@@ -375,7 +375,10 @@ function backup() {
 function getDownloadUrl($file) {
   $download = $file['downloadUrl'] ?? "";
   if (!$download) {
-    $download = URL_DOWNLOAD . substr($file['id'] ?? 'noid', 0, 4) . "/" . substr($file['id'] ?? '    nid', 4, 3) . "/" . ($file['fileName'] ?? '')
+    $download = URL_DOWNLOAD 
+      . intval(substr($file['id'] ?? 'noid', 0, 4)) . "/" 
+      . intval(substr($file['id'] ?? '    nid', 4, 3)) . "/" 
+      . ($file['fileName'] ?? '')
       . "?not-sure-url";
   }
   
