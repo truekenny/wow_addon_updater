@@ -54,6 +54,8 @@ const VERSION_URL = 'https://raw.githubusercontent.com/truekenny/wow_addon_updat
 
 const SOFT_URL = 'https://github.com/truekenny/wow_addon_updater';
 
+const CURSE_SORT_FIELD_POPULAR = 2;
+
 define('SCRIPT_DIR', dirname($_SERVER['SCRIPT_FILENAME']));
 define('VERSIONS_FILE', SCRIPT_DIR . DIRECTORY_SEPARATOR . 'versions.txt');
 $keyFilename = SCRIPT_DIR . DIRECTORY_SEPARATOR . 'key.txt';
@@ -64,6 +66,12 @@ define('KEY', trim(file_get_contents($keyFilename)));
 define('UNFOUND_ADDONS_FILE', SCRIPT_DIR . DIRECTORY_SEPARATOR . 'unfound.txt');
 
 define('VERSION_FILE', SCRIPT_DIR . DIRECTORY_SEPARATOR . 'version.txt');
+
+define('REQUEST_HEADERS', [
+  'User-Agent: ' . SOFT_URL,
+  'Accept: application/json',
+  'x-api-key: ' . KEY,
+]);
 
 // Устанавливает GAME_VERSION
 function getGameVersion() {
@@ -88,12 +96,10 @@ function getGameVersion() {
 
 getGameVersion();
 
-// Выполняет HTTP запрос и возвращает содержимое
-function get($url, $withKey = true) {
+// Инициализация ресурса curl
+function getCurl($url, $withKey = true) {
   $ch = curl_init();
   curl_setopt($ch, CURLOPT_URL, $url);
-  // curl_setopt($ch, CURLOPT_POST, 1);
-  // curl_setopt($ch, CURLOPT_POSTFIELDS, $vars); // Post Fields
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
   
   curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
@@ -101,15 +107,17 @@ function get($url, $withKey = true) {
   curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 
   if ($withKey) {
-    $headers = [
-        'User-Agent: Php wow addon updater 0.0.1',
-        'Accept: application/json',
-        'x-api-key: ' . KEY,
-    ];
+    $headers = REQUEST_HEADERS;
 
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
   }
 
+  return $ch;
+}
+
+// Выполняет HTTP запрос и возвращает содержимое
+function get($url, $withKey = true) {
+  $ch = getCurl($url, $withKey);
   $server_output = curl_exec($ch);
   
   if (!$server_output) {
@@ -290,12 +298,8 @@ function freshLocalVersionFromDisk($addonNames) {
 
 $addonNames = freshLocalVersionFromDisk($addonNames);
 
-// Возвращает информацию о моде по имени
-function getMod($name) {
-  $query = http_build_query(['gameId' => GAME_ID_WOW, 'searchFilter' => $name, 'sortField' => 2, 'sortOrder' => 'desc']); // 2 - popular
-  
-  $mods = get(URL_SEARCH_MOD . $query);
-  $mods = json_decode($mods, true);
+// Парсит результат поиска и возвращает мод с наиболее подходящим именем name
+function getMod($mods, $name) {
   // var_dump($mods);
   
   // Полное совпадение имени
@@ -326,8 +330,6 @@ function getMod($name) {
 
   return null;
 }
-
-// $mod = getMod("DBM - Dungeons & Events (Requires Deadly Boss Mods)"); echo(json_encode($mod, JSON_PRETTY_PRINT)); die;
 
 // Удаляет старые резервние копии
 function removeOldBackups() {
@@ -427,14 +429,66 @@ function updateMod($url, $filename) {
   unlink($fullfilename);
 }
 
+// Выполняет одновременные запросы к api и возвращает массив результата
+function getMods($names) {
+  $result = [];
+
+  $chs = [];
+  $mh = curl_multi_init();
+  
+  // init
+  foreach ($names as $name) {
+    $query = http_build_query([
+      'gameId' => GAME_ID_WOW,
+      'searchFilter' => $name,
+      'sortField' => CURSE_SORT_FIELD_POPULAR,
+      'sortOrder' => 'desc']);
+    $url = URL_SEARCH_MOD . $query;
+    $ch = getCurl($url, true);
+
+    $chs[$name] = $ch;
+    curl_multi_add_handle($mh, $ch);
+  }
+  
+  // exec
+  echo "Requests processing..";
+  $lastPrint = time();
+  do {
+    $status = curl_multi_exec($mh, $active);
+    // Ставлю точку не чаще 1 раза в секунду
+    if ($lastPrint <> time()) {
+      echo ".";
+      $lastPrint = time();
+    }
+    if ($active) {
+        curl_multi_select($mh);
+    }
+  } while ($active && $status == CURLM_OK);
+  echo "\n\n";
+  
+  // parse data
+  foreach ($chs as $name => $ch) {
+    $response = curl_multi_getcontent($ch);
+    $result[$name] = getMod(json_decode($response, true), $name);
+    curl_multi_remove_handle($mh, $ch);
+  }
+  curl_multi_close($mh);
+  
+  return $result;
+}
+
 // Главный цикл перебора аддонов
 function main($addonNames) {
   $log = [];
   $index = 0;
+  
+  // multi request
+  $mods = getMods(array_keys($addonNames));
+  
   foreach ($addonNames as $name => $version) {
     echo "{$name} local: [$version]\n";
 
-    $mod = getMod($name);
+    $mod = $mods[$name];
     
     $modId = $mod['id'] ?? 'no';
     echo "  remote_name: " . ($mod['name'] ?? 'Has no name') . " mod_id: $modId\n";
