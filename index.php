@@ -56,6 +56,8 @@ const SOFT_URL = 'https://github.com/truekenny/wow_addon_updater';
 
 const CURSE_SORT_FIELD_POPULAR = 2;
 
+const MULTI_REQEUST_MAX = 10;
+
 define('SCRIPT_DIR', dirname($_SERVER['SCRIPT_FILENAME']));
 define('VERSIONS_FILE', SCRIPT_DIR . DIRECTORY_SEPARATOR . 'versions.txt');
 $keyFilename = SCRIPT_DIR . DIRECTORY_SEPARATOR . 'key.txt';
@@ -430,49 +432,53 @@ function updateMod($url, $filename) {
 }
 
 // Выполняет одновременные запросы к api и возвращает массив результата
-function getMods($names) {
+function getMods($allNames) {
   $result = [];
 
-  $chs = [];
-  $mh = curl_multi_init();
-  
-  // init
-  foreach ($names as $name) {
-    $query = http_build_query([
-      'gameId' => GAME_ID_WOW,
-      'searchFilter' => $name,
-      'sortField' => CURSE_SORT_FIELD_POPULAR,
-      'sortOrder' => 'desc']);
-    $url = URL_SEARCH_MOD . $query;
-    $ch = getCurl($url, true);
-
-    $chs[$name] = $ch;
-    curl_multi_add_handle($mh, $ch);
-  }
-  
-  // exec
-  echo "Requests processing..";
+  echo "Requests processing...";
   $lastPrint = time();
-  do {
-    $status = curl_multi_exec($mh, $active);
-    // Ставлю точку не чаще 1 раза в секунду
-    if ($lastPrint <> time()) {
-      echo ".";
-      $lastPrint = time();
+
+  foreach(array_chunk($allNames, MULTI_REQEUST_MAX) as $names) {
+    $chs = [];
+    $mh = curl_multi_init();
+    
+    // init
+    foreach ($names as $name) {
+      $query = http_build_query([
+        'gameId' => GAME_ID_WOW,
+        'searchFilter' => $name,
+        'sortField' => CURSE_SORT_FIELD_POPULAR,
+        'sortOrder' => 'desc']);
+      $url = URL_SEARCH_MOD . $query;
+      $ch = getCurl($url, true);
+
+      $chs[$name] = $ch;
+      curl_multi_add_handle($mh, $ch);
     }
-    if ($active) {
-        curl_multi_select($mh);
+    
+    // exec
+    do {
+      $status = curl_multi_exec($mh, $active);
+      // Ставлю точку не чаще 1 раза в секунду
+      if ($lastPrint <> time()) {
+        echo ".";
+        $lastPrint = time();
+      }
+      if ($active) {
+          curl_multi_select($mh);
+      }
+    } while ($active && $status == CURLM_OK);
+    
+    // parse data
+    foreach ($chs as $name => $ch) {
+      $response = curl_multi_getcontent($ch);
+      $result[$name] = getMod(json_decode($response, true), $name);
+      curl_multi_remove_handle($mh, $ch);
     }
-  } while ($active && $status == CURLM_OK);
-  echo "\n\n";
-  
-  // parse data
-  foreach ($chs as $name => $ch) {
-    $response = curl_multi_getcontent($ch);
-    $result[$name] = getMod(json_decode($response, true), $name);
-    curl_multi_remove_handle($mh, $ch);
+    curl_multi_close($mh);
   }
-  curl_multi_close($mh);
+
+  echo "\n\n";
   
   return $result;
 }
