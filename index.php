@@ -567,3 +567,6 @@ $log = main($addonNames);
 foreach($log as $index => $line) {
   echo "$index. $line\n";
 }
+if (!count($log)) {
+  echo "No updates found\n";
+}
